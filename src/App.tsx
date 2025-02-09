@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Heart, Activity, AlertCircle } from 'lucide-react';
+import { Heart, Activity, AlertCircle, Info } from 'lucide-react';
 
 interface PredictionResult {
   prediction: number;
@@ -12,27 +12,24 @@ function App() {
     Age: 45,
     Sex: 'Male',
     Cholesterol: 200,
-    Blood_Pressure: 120,
+    Blood_Pressure: '120/80',
     Heart_Rate: 75,
-    Diabetes: false,
-    Family_History: false,
-    Smoking: false,
-    Obesity: false,
-    Alcohol_Consumption: 'None',
+    Diabetes: 0,
+    Family_History: 0,
+    Smoking: 0,
+    Obesity: 0,
+    Alcohol_Consumption: 0,
     Exercise_Hours_Per_Week: 3,
     Diet: 'Average',
-    Previous_Heart_Problems: false,
-    Medication_Use: false,
+    Previous_Heart_Problems: 0,
+    Medication_Use: 0,
     Stress_Level: 5,
     Sedentary_Hours_Per_Day: 8,
     Income: 50000,
     BMI: 25,
     Triglycerides: 150,
     Physical_Activity_Days_Per_Week: 3,
-    Sleep_Hours_Per_Day: 7,
-    Country: 'USA',
-    Continent: 'North America',
-    Hemisphere: 'Northern'
+    Sleep_Hours_Per_Day: 7
   });
 
   const [result, setResult] = useState<PredictionResult | null>(null);
@@ -45,10 +42,42 @@ function App() {
     setError(null);
 
     try {
-      const response = await axios.post('http://localhost:5000/predict', formData);
+      const [BP_Systolic, BP_Diastolic] = formData.Blood_Pressure.split('/').map(Number);
+      const Sex_Male = formData.Sex === 'Male' ? 1 : 0;
+      const Sex_Female = formData.Sex === 'Female' ? 1 : 0;
+
+      const apiData = {
+        Age: formData.Age,
+        Sex_Male: Sex_Male,
+        Sex_Female: Sex_Female,
+        Cholesterol: formData.Cholesterol,
+        BP_Systolic: BP_Systolic,
+        BP_Diastolic: BP_Diastolic,
+        Heart_Rate: formData.Heart_Rate,
+        Diabetes: Number(formData.Diabetes),
+        Family_History: Number(formData.Family_History),
+        Smoking: Number(formData.Smoking),
+        Obesity: Number(formData.Obesity),
+        Alcohol_Consumption: formData.Alcohol_Consumption,
+        Exercise_Hours_Per_Week: formData.Exercise_Hours_Per_Week,
+        Diet: formData.Diet === 'Unhealthy' ? 0 : formData.Diet === 'Average' ? 1 : 2,
+        Previous_Heart_Problems: Number(formData.Previous_Heart_Problems),
+        Medication_Use: Number(formData.Medication_Use),
+        Stress_Level: formData.Stress_Level,
+        Sedentary_Hours_Per_Day: formData.Sedentary_Hours_Per_Day,
+        Income: formData.Income,
+        BMI: formData.BMI,
+        Triglycerides: formData.Triglycerides,
+        Physical_Activity_Days_Per_Week: formData.Physical_Activity_Days_Per_Week,
+        Sleep_Hours_Per_Day: formData.Sleep_Hours_Per_Day
+      };
+
+      console.log("Sending Data:", JSON.stringify(apiData, null, 2));
+
+      const response = await axios.post('http://localhost:5000/predict', apiData);
       setResult(response.data);
-    } catch (err) {
-      setError('Error making prediction. Please try again.');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error making prediction. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -57,51 +86,65 @@ function App() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+
+    let processedValue: any;
+    if (type === 'checkbox') {
+      processedValue = (e.target as HTMLInputElement).checked ? 1 : 0;
+    } else if (type === 'number') {
+      processedValue = Number(value);
+    } else {
+      processedValue = value;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
-              type === 'number' ? Number(value) : value
+      [name]: processedValue
     }));
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <Heart className="mx-auto h-12 w-12 text-red-500" />
-          <h1 className="mt-3 text-3xl font-extrabold text-gray-900">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-100 mb-4">
+            <Heart className="h-12 w-12 text-red-500" />
+          </div>
+          <h1 className="mt-3 text-4xl font-extrabold text-gray-900 tracking-tight">
             Heart Attack Risk Prediction
           </h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Enter your health information to assess your heart attack risk
+          <p className="mt-4 text-xl text-gray-600 max-w-2xl mx-auto">
+            Enter your health information below to receive a personalized heart attack risk assessment
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6 bg-white p-8 rounded-lg shadow">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             {/* Personal Information */}
             <div className="col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+              <div className="flex items-center space-x-2 mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Personal Information</h3>
+                <div className="h-px flex-1 bg-gray-200"></div>
+              </div>
             </div>
-            
-            <div>
+
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Age</label>
               <input
                 type="number"
                 name="Age"
                 value={formData.Age}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Sex</label>
               <select
                 name="Sex"
                 value={formData.Sex}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               >
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -110,194 +153,180 @@ function App() {
 
             {/* Health Metrics */}
             <div className="col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Health Metrics</h3>
+              <div className="flex items-center space-x-2 mb-6 mt-4">
+                <h3 className="text-xl font-semibold text-gray-900">Health Metrics</h3>
+                <div className="h-px flex-1 bg-gray-200"></div>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Cholesterol (mg/dL)</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                <div className="flex items-center space-x-1">
+                  <span>Cholesterol (mg/dL)</span>
+                  <Info className="h-4 w-4 text-gray-400" />
+                </div>
+              </label>
               <input
                 type="number"
                 name="Cholesterol"
                 value={formData.Cholesterol}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Blood Pressure (mmHg)</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Blood Pressure (systolic/diastolic)</label>
               <input
-                type="number"
+                type="text"
                 name="Blood_Pressure"
                 value={formData.Blood_Pressure}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                placeholder="120/80"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Heart Rate (bpm)</label>
               <input
                 type="number"
                 name="Heart_Rate"
                 value={formData.Heart_Rate}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">BMI</label>
               <input
                 type="number"
                 name="BMI"
                 value={formData.BMI}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Triglycerides (mg/dL)</label>
               <input
                 type="number"
                 name="Triglycerides"
                 value={formData.Triglycerides}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
             {/* Medical History */}
             <div className="col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Medical History</h3>
+              <div className="flex items-center space-x-2 mb-6 mt-4">
+                <h3 className="text-xl font-semibold text-gray-900">Medical History</h3>
+                <div className="h-px flex-1 bg-gray-200"></div>
+              </div>
             </div>
 
-            <div>
-              <label className="flex items-center">
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                 <input
                   type="checkbox"
                   name="Diabetes"
-                  checked={formData.Diabetes}
+                  checked={Boolean(formData.Diabetes)}
                   onChange={handleInputChange}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
                 />
-                <span className="ml-2 text-sm text-gray-700">Diabetes</span>
+                <span className="text-sm text-gray-700">Diabetes</span>
               </label>
             </div>
 
-            <div>
-              <label className="flex items-center">
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                 <input
                   type="checkbox"
                   name="Family_History"
-                  checked={formData.Family_History}
+                  checked={Boolean(formData.Family_History)}
                   onChange={handleInputChange}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
                 />
-                <span className="ml-2 text-sm text-gray-700">Family History of Heart Disease</span>
-              </label>
-            </div>
-
-            <div>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="Previous_Heart_Problems"
-                  checked={formData.Previous_Heart_Problems}
-                  onChange={handleInputChange}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="ml-2 text-sm text-gray-700">Previous Heart Problems</span>
-              </label>
-            </div>
-
-            <div>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="Medication_Use"
-                  checked={formData.Medication_Use}
-                  onChange={handleInputChange}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="ml-2 text-sm text-gray-700">Currently Using Medication</span>
+                <span className="text-sm text-gray-700">Family History of Heart Disease</span>
               </label>
             </div>
 
             {/* Lifestyle Factors */}
             <div className="col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Lifestyle Factors</h3>
+              <div className="flex items-center space-x-2 mb-6 mt-4">
+                <h3 className="text-xl font-semibold text-gray-900">Lifestyle Factors</h3>
+                <div className="h-px flex-1 bg-gray-200"></div>
+              </div>
             </div>
 
-            <div>
-              <label className="flex items-center">
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                 <input
                   type="checkbox"
                   name="Smoking"
-                  checked={formData.Smoking}
+                  checked={Boolean(formData.Smoking)}
                   onChange={handleInputChange}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
                 />
-                <span className="ml-2 text-sm text-gray-700">Smoking</span>
+                <span className="text-sm text-gray-700">Smoking</span>
               </label>
             </div>
 
-            <div>
-              <label className="flex items-center">
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                 <input
                   type="checkbox"
                   name="Obesity"
-                  checked={formData.Obesity}
+                  checked={Boolean(formData.Obesity)}
                   onChange={handleInputChange}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
                 />
-                <span className="ml-2 text-sm text-gray-700">Obesity</span>
+                <span className="text-sm text-gray-700">Obesity</span>
               </label>
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Alcohol Consumption</label>
               <select
                 name="Alcohol_Consumption"
                 value={formData.Alcohol_Consumption}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               >
-                <option value="None">None</option>
-                <option value="Light">Light</option>
-                <option value="Moderate">Moderate</option>
-                <option value="Heavy">Heavy</option>
+                <option value={0}>No</option>
+                <option value={1}>Yes</option>
               </select>
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Diet</label>
               <select
                 name="Diet"
                 value={formData.Diet}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               >
-                <option value="Poor">Poor</option>
+                <option value="Unhealthy">Unhealthy</option>
                 <option value="Average">Average</option>
-                <option value="Good">Good</option>
-                <option value="Excellent">Excellent</option>
+                <option value="Healthy">Healthy</option>
               </select>
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Exercise Hours Per Week</label>
               <input
                 type="number"
                 name="Exercise_Hours_Per_Week"
                 value={formData.Exercise_Hours_Per_Week}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Physical Activity Days Per Week</label>
               <input
                 type="number"
@@ -306,33 +335,33 @@ function App() {
                 onChange={handleInputChange}
                 min="0"
                 max="7"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Sleep Hours Per Day</label>
               <input
                 type="number"
                 name="Sleep_Hours_Per_Day"
                 value={formData.Sleep_Hours_Per_Day}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Sedentary Hours Per Day</label>
               <input
                 type="number"
                 name="Sedentary_Hours_Per_Day"
                 value={formData.Sedentary_Hours_Per_Day}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Stress Level (1-10)</label>
               <input
                 type="number"
@@ -341,106 +370,83 @@ function App() {
                 onChange={handleInputChange}
                 min="1"
                 max="10"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
             </div>
 
-            {/* Demographic Information */}
-            <div className="col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Demographic Information</h3>
-            </div>
-
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Income</label>
               <input
                 type="number"
                 name="Income"
                 value={formData.Income}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Country</label>
-              <input
-                type="text"
-                name="Country"
-                value={formData.Country}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Continent</label>
-              <select
-                name="Continent"
-                value={formData.Continent}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="North America">North America</option>
-                <option value="South America">South America</option>
-                <option value="Europe">Europe</option>
-                <option value="Asia">Asia</option>
-                <option value="Africa">Africa</option>
-                <option value="Australia">Australia</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Hemisphere</label>
-              <select
-                name="Hemisphere"
-                value={formData.Hemisphere}
-                onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="Northern">Northern</option>
-                <option value="Southern">Southern</option>
-              </select>
             </div>
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex justify-center pt-6">
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="inline-flex items-center px-8 py-4 border border-transparent text-lg font-medium rounded-xl text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-lg transform transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {loading ? (
-                <Activity className="animate-spin h-5 w-5 mr-3" />
+                <>
+                  <Activity className="animate-spin h-5 w-5 mr-3" />
+                  Processing...
+                </>
               ) : (
-                'Predict Risk'
+                'Calculate Risk'
               )}
             </button>
           </div>
         </form>
 
         {error && (
-          <div className="mt-4 p-4 bg-red-50 rounded-md">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-red-400" />
+          <div className="mt-6 p-4 bg-red-50 rounded-xl border border-red-100">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
               <p className="ml-3 text-sm text-red-700">{error}</p>
             </div>
           </div>
         )}
 
         {result && (
-          <div className="mt-8 bg-white p-6 rounded-lg shadow">
-            <h2 className="text-lg font-medium text-gray-900">Prediction Result</h2>
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">
-                Risk Level: <span className="font-medium text-gray-900">
-                  {result.prediction === 1 ? 'High Risk' : 'Low Risk'}
-                </span>
-              </p>
-              <p className="text-sm text-gray-500">
-                Probability: <span className="font-medium text-gray-900">
-                  {(result.probability * 100).toFixed(2)}%
-                </span>
-              </p>
+          <div className="mt-8 bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Your Risk Assessment</h2>
+            <div className="space-y-4">
+              <div className={`p-4 rounded-lg ${
+                result.prediction === 1 
+                  ? 'bg-red-50 border-2 border-red-100' 
+                  : 'bg-green-50 border-2 border-green-100'
+              }`}>
+                <p className="text-lg font-medium">
+                  Risk Level: {' '}
+                  <span className={
+                    result.prediction === 1 ? 'text-red-700' : 'text-green-700'
+                  }>
+                    {result.prediction === 1 ? 'High Risk' : 'Low Risk'}
+                  </span>
+                </p>
+                <div className="mt-2 bg-white rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Risk Probability</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {(result.probability * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 bg-gray-200 rounded-full">
+                    <div
+                      className={`h-2 rounded-full ${
+                        result.prediction === 1 ? 'bg-red-500' : 'bg-green-500'
+                      }`}
+                      style={{ width: `${result.probability * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
