@@ -1,113 +1,173 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import joblib
+import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 import logging
 import traceback
+import json
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
-# Load the model
 try:
+    # Load the saved model and scaler
     model = joblib.load('trained_rfc_model.pkl')
-    scaler = StandardScaler()  # You'll need to save and load your scaler as well
-    logger.info("Model loaded successfully")
+    scaler = joblib.load('scaler.pkl')
+    feature_names = joblib.load('feature_names.pkl')
+    logger.info("Model and scaler loaded successfully")
 except Exception as e:
-    logger.error(f"Error loading model: {str(e)}")
+    logger.error(f"Error loading model: {e}")
     logger.error(traceback.format_exc())
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "healthy"}), 200
+def preprocess_input_data(data):
+    # Map frontend field names to backend field names
+    field_mapping = {
+        'Age': 'Age',
+        'Sex_Male': 'Sex_Male',
+        'Sex_Female': 'Sex_Female',
+        'Cholesterol': 'Cholesterol',
+        'BP_Systolic': 'BP_Systolic',
+        'BP_Diastolic': 'BP_Diastolic',
+        'Heart_Rate': 'Heart Rate',
+        'Diabetes': 'Diabetes',
+        'Family_History': 'Family History',
+        'Smoking': 'Smoking',
+        'Obesity': 'Obesity',
+        'Alcohol_Consumption': 'Alcohol Consumption',
+        'Exercise_Hours_Per_Week': 'Exercise Hours Per Week',
+        'Diet': 'Diet',
+        'Previous_Heart_Problems': 'Previous Heart Problems',
+        'Medication_Use': 'Medication Use',
+        'Stress_Level': 'Stress Level',
+        'Sedentary_Hours_Per_Day': 'Sedentary Hours Per Day',
+        'Income': 'Income',
+        'BMI': 'BMI',
+        'Triglycerides': 'Triglycerides',
+        'Physical_Activity_Days_Per_Week': 'Physical Activity Days Per Week',
+        'Sleep_Hours_Per_Day': 'Sleep Hours Per Day'
+    }
 
-@app.route('/predict', methods=['POST'])
-def predict():
+    # Create DataFrame from input
+    df = pd.DataFrame([data])
+    logger.debug(f"Initial DataFrame: {df}")
+
+    # Process Blood Pressure
     try:
-        # Get data from request
+        if 'Blood Pressure' in df.columns:
+            bp = df['Blood Pressure'].iloc[0]
+            if isinstance(bp, str) and '/' in bp:
+                systolic, diastolic = bp.split('/')
+                df['BP_Systolic'] = int(systolic)
+                df['BP_Diastolic'] = int(diastolic)
+            else:
+                raise ValueError("Blood Pressure must be in format 'systolic/diastolic'")
+            df.drop('Blood Pressure', axis=1, inplace=True)
+        logger.debug(f"DataFrame after processing Blood Pressure: {df}")
+    except Exception as e:
+        raise ValueError(f"Error processing Blood Pressure: {str(e)}")
+
+    # Process Diet
+    #try:
+      #  if 'Diet' in df.columns:
+         #   diet_map = {'Healthy': 2, 'Average': 1, 'Unhealthy': 0}
+          #  if df['Diet'].iloc[0] not in diet_map:
+             #   raise ValueError("Diet must be one of: Healthy, Average, Unhealthy")
+            # df['Diet'] = df['Diet'].map(diet_map)
+      #  logger.debug(f"DataFrame after processing Diet: {df}")
+   # except Exception as e:
+       # raise ValueError(f"Error processing Diet: {str(e)}")
+
+    try:
+        if 'Sex' in df.columns:
+            sex = df['Sex'].iloc[0]
+            if sex not in ['Male', 'Female']:
+                raise ValueError("Sex must be either 'Male' or 'Female'")
+            df['Sex_Female'] = 1 if sex == 'Female' else 0
+            df['Sex_Male'] = 1 if sex == 'Male' else 0
+            df.drop('Sex', axis=1, inplace=True)
+        logger.debug(f"DataFrame after processing Sex: {df}")
+    except Exception as e:
+        raise ValueError(f"Error processing Sex: {str(e)}")
+
+    # Ensure all numeric columns are numeric
+    numeric_columns = [
+        'Age', 'Cholesterol', 'Heart Rate', 'Diabetes', 'Family History',
+        'Smoking', 'Obesity', 'Alcohol Consumption', 'Exercise Hours Per Week',
+        'Previous Heart Problems', 'Medication Use', 'Stress Level',
+        'Sedentary Hours Per Day', 'Income', 'BMI', 'Triglycerides',
+        'Physical Activity Days Per Week', 'Sleep Hours Per Day'
+    ]
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col])
+            except Exception:
+                raise ValueError(f"Column {col} must be numeric and contain valid numeric values")
+        logger.debug(f"DataFrame after ensuring numeric columns: {df}")
+
+    # Map frontend field names to backend field names
+    processed_data = {field_mapping[key]: value for key, value in data.items()}
+    logger.debug(f"Processed data: {processed_data}")
+
+    # Ensure all required features are present
+    missing_cols = set(feature_names) - set(processed_data.keys())
+    if missing_cols:
+        raise ValueError(f"Missing required features: {missing_cols}")
+
+    # Reorder columns to match training data
+    final_df = pd.DataFrame([processed_data])[feature_names]
+    logger.debug(f"Final DataFrame: {final_df}")
+    return final_df
+
+@app.route('/predict', methods=['POST', 'OPTIONS'])
+def predict():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    try:
+        # Get JSON data from request
         data = request.json
+        logger.info("Received Data: %s", json.dumps(data, indent=4))  # Logging
+
+        # Preprocess the input data
+        processed_data = preprocess_input_data(data)
         
-        # Validate input data
-        required_features = [
-            'Age', 'Sex', 'Cholesterol', 'Blood_Pressure', 
-            'Heart_Rate', 'Diabetes', 'Family_History', 
-            'Smoking', 'Obesity', 'Alcohol_Consumption',
-            'Exercise_Hours_Per_Week', 'Diet', 'Previous_Heart_Problems',
-            'Medication_Use', 'Stress_Level', 'Sedentary_Hours_Per_Day',
-            'Income', 'BMI', 'Triglycerides', 'Physical_Activity_Days_Per_Week',
-            'Sleep_Hours_Per_Day', 'Country', 'Continent', 'Hemisphere'
-        ]
-        
-        for feature in required_features:
-            if feature not in data:
-                return jsonify({
-                    "error": f"Missing required feature: {feature}"
-                }), 400
-        
-        # Prepare input data
-        features = np.array([data[feature] for feature in required_features]).reshape(1, -1)
-        
-        # Scale features
-        scaled_features = scaler.transform(features)
+        # Scale the processed data
+        scaled_data = scaler.transform(processed_data)
         
         # Make prediction
-        prediction = model.predict(scaled_features)
-        prediction_proba = model.predict_proba(scaled_features)
+        prediction = model.predict(scaled_data)
+        prediction_proba = model.predict_proba(scaled_data)
         
-        # Log prediction
-        logger.info(f"Prediction made for input: {data}")
+        # Prepare response
+        response = {
+            'prediction': int(prediction[0]),
+            'probability': float(prediction_proba[0][1]),
+            'message': 'Prediction successful'
+        }
         
+        return jsonify(response)
+        
+    except ValueError as ve:
+        logger.error(f"Validation error: {str(ve)}")
         return jsonify({
-            "prediction": int(prediction[0]),
-            "probability": float(prediction_proba[0][1])
-        })
+            'error': str(ve),
+            'error_type': 'validation'
+        }), 400
         
     except Exception as e:
-        logger.error(f"Error making prediction: {str(e)}")
+        logger.error(f"Error making prediction: {e}")
         logger.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/model-info', methods=['GET'])
-def model_info():
-    return jsonify({
-        "model_type": "Random Forest Classifier",
-        "features": [
-            {"name": "Age", "type": "numeric", "description": "Age of the patient"},
-            {"name": "Sex", "type": "categorical", "description": "Gender of the patient"},
-            {"name": "Cholesterol", "type": "numeric", "description": "Cholesterol level"},
-            {"name": "Blood_Pressure", "type": "numeric", "description": "Blood pressure reading"},
-            {"name": "Heart_Rate", "type": "numeric", "description": "Heart rate"},
-            {"name": "Diabetes", "type": "boolean", "description": "Whether patient has diabetes"},
-            {"name": "Family_History", "type": "boolean", "description": "Family history of heart disease"},
-            {"name": "Smoking", "type": "boolean", "description": "Smoking status"},
-            {"name": "Obesity", "type": "boolean", "description": "Obesity status"},
-            {"name": "Alcohol_Consumption", "type": "categorical", "description": "Level of alcohol consumption"},
-            {"name": "Exercise_Hours_Per_Week", "type": "numeric", "description": "Hours of exercise per week"},
-            {"name": "Diet", "type": "categorical", "description": "Type of diet"},
-            {"name": "Previous_Heart_Problems", "type": "boolean", "description": "History of heart problems"},
-            {"name": "Medication_Use", "type": "boolean", "description": "Current medication use"},
-            {"name": "Stress_Level", "type": "numeric", "description": "Stress level (1-10)"},
-            {"name": "Sedentary_Hours_Per_Day", "type": "numeric", "description": "Hours of sedentary activity per day"},
-            {"name": "Income", "type": "numeric", "description": "Income level"},
-            {"name": "BMI", "type": "numeric", "description": "Body Mass Index"},
-            {"name": "Triglycerides", "type": "numeric", "description": "Triglycerides level"},
-            {"name": "Physical_Activity_Days_Per_Week", "type": "numeric", "description": "Days of physical activity per week"},
-            {"name": "Sleep_Hours_Per_Day", "type": "numeric", "description": "Hours of sleep per day"},
-            {"name": "Country", "type": "categorical", "description": "Country of residence"},
-            {"name": "Continent", "type": "categorical", "description": "Continent of residence"},
-            {"name": "Hemisphere", "type": "categorical", "description": "Hemisphere of residence"}
-        ],
-        "version": "1.0.0"
-    })
+        return jsonify({
+            'error': 'An unexpected error occurred',
+            'error_type': 'server'
+        }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
