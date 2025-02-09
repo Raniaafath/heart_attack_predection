@@ -101,7 +101,7 @@ Feel free to submit issues or pull requests to enhance the project.
 This project is open-source and available under the MIT License.
 
 ## Author
-**Your Name** – [GitHub Profile](https://github.com/your-username/)
+Rania Fathallah 
 
 
-[Edit in StackBlitz next generation editor ⚡️](https://stackblitz.com/~/github.com/Raniaafath/heart_attack_predection)
+
